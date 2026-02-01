@@ -56,14 +56,50 @@ export default function OrderTrackingPage() {
   const baseProgress = stage === 1 ? 33 : stage === 2 ? 66 : 100;
 
   // Carrega meta do pedido (itens/endereço/pagamento)
-  useEffect(() => {
+  const API_BASE = "https://fruits-against-makes-intervals.trycloudflare.com"; // ou coloque sua URL fixa do backend
+
+useEffect(() => {
+  let cancelled = false;
+
+  const loadMeta = async () => {
+    // 1) tenta localStorage
     try {
       const raw = localStorage.getItem(`order_meta_${pedidoId}`);
-      if (raw) setMeta(JSON.parse(raw));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (!cancelled) setMeta(parsed);
+        return;
+      }
     } catch {
       // ignora
     }
-  }, [pedidoId]);
+
+    // 2) fallback: busca no backend
+    if (!API_BASE) return;
+
+    try {
+      const resp = await fetch(`${API_BASE}/pedido/${pedidoId}/meta`);
+      const data = await resp.json();
+
+      if (!resp.ok) return;
+
+      // salva pra próximos refresh
+      try {
+        localStorage.setItem(`order_meta_${pedidoId}`, JSON.stringify(data));
+      } catch {}
+
+      if (!cancelled) setMeta(data);
+    } catch {
+      // ignora
+    }
+  };
+
+  loadMeta();
+
+  return () => {
+    cancelled = true;
+  };
+}, [pedidoId]);
 
   // Inicializa simulação persistente
   useEffect(() => {
