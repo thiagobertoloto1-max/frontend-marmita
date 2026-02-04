@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { CheckCircle2, CookingPot, Bike, Clock, HelpCircle, X } from "lucide-react";
 import logo from "@/assets/logoreal.webp";
+import { getOrderMeta, type OrderMeta } from "@/services/api";
 
 type Stage = 1 | 2 | 3;
 
@@ -12,30 +13,6 @@ function getRandomInt(min: number, max: number) {
 function formatEta(mins: number) {
   return `${mins}–${mins + 10} min`;
 }
-
-type OrderMeta = {
-  restaurantName?: string;
-  paymentMethod?: string;
-  customerName?: string;
-  customerPhone?: string;
-  address?: {
-    street?: string;
-    number?: string;
-    complement?: string;
-    neighborhood?: string;
-    city?: string;
-    state?: string;
-    zipCode?: string;
-  } | null;
-  items?: Array<{
-    name: string;
-    size?: string;
-    qty: number;
-    price: number;
-  }>;
-  totalReais?: string;
-  createdAt?: string;
-};
 
 export default function OrderTrackingPage() {
   const params = useParams();
@@ -55,9 +32,6 @@ export default function OrderTrackingPage() {
 
   const baseProgress = stage === 1 ? 33 : stage === 2 ? 66 : 100;
 
-  // Carrega meta do pedido (itens/endereço/pagamento)
-  const API_BASE = "https://view-warrior-criteria-strike.trycloudflare.com"; // ou coloque sua URL fixa do backend
-
 useEffect(() => {
   let cancelled = false;
 
@@ -75,13 +49,11 @@ useEffect(() => {
     }
 
     // 2) fallback: busca no backend
-    if (!API_BASE) return;
+    const numericId = Number(pedidoId);
+    if (!Number.isFinite(numericId)) return;
 
     try {
-      const resp = await fetch(`${API_BASE}/pedido/${pedidoId}/meta`);
-      const data = await resp.json();
-
-      if (!resp.ok) return;
+      const data = await getOrderMeta(numericId);
 
       // salva pra próximos refresh
       try {

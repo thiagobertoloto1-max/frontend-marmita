@@ -1,47 +1,18 @@
 // src/services/paymentService.ts
-// Pagamento Pix via backend Render (AnubisPay) — versão estável + compatibilidade
 
-const API_BASE = "https://view-warrior-criteria-strike.trycloudflare.com";
+import {
+  createPayment,
+  getOrder,
+  type CreatePaymentPayload,
+  type CreatePaymentResponse,
+  type PedidoStatusResponse,
+} from "@/services/api";
 
 /* ------------------------------------------------------------------
    TIPOS
 ------------------------------------------------------------------ */
 
-export type CartItemPayload = {
-  sku: string;
-  qty: number;
-};
-
-export type CreatePaymentPayload = {
-  nome: string;
-  telefone: string;
-  cpf: string;
-  items: CartItemPayload[];
-};
-
-export type CreatePaymentResponse = {
-  pedido_id: number;
-  transacao_id: string;
-  total_cents: number;
-  total_reais: string;
-  pix: {
-    qr_code: string;
-    url: string | null;
-    expiration_date: string;
-    e2_e: string | null;
-  };
-};
-
-export type PedidoStatusResponse = {
-  id: number;
-  nome: string;
-  telefone: string;
-  valor: number;
-  status: "AGUARDANDO" | "PAGO" | string;
-  transacao_id: string;
-  items?: string;
-  total_cents?: number;
-};
+export type { CreatePaymentPayload, CreatePaymentResponse, PedidoStatusResponse };
 
 /* ------------------------------------------------------------------
    FUNÇÕES PRINCIPAIS (BACKEND NOVO)
@@ -50,32 +21,13 @@ export type PedidoStatusResponse = {
 export async function criarPagamentoPix(
   payload: CreatePaymentPayload
 ): Promise<CreatePaymentResponse> {
-  const resp = await fetch(`${API_BASE}/create-payment`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await resp.json().catch(() => ({}));
-
-  if (!resp.ok) {
-    throw new Error(data?.erro || "Erro ao criar pagamento Pix");
-  }
-
-  return data as CreatePaymentResponse;
+  return createPayment(payload);
 }
 
 export async function consultarPedido(
   pedidoId: number
 ): Promise<PedidoStatusResponse> {
-  const resp = await fetch(`${API_BASE}/pedido/${pedidoId}`);
-  const data = await resp.json().catch(() => ({}));
-
-  if (!resp.ok) {
-    throw new Error(data?.erro || "Erro ao consultar pedido");
-  }
-
-  return data as PedidoStatusResponse;
+  return getOrder(pedidoId);
 }
 
 /* ------------------------------------------------------------------

@@ -1,4 +1,4 @@
-// Location Service - IP geolocation and IBGE API integration via Edge Function proxy
+// Location Service - IP geolocation and IBGE API integration
 
 export interface LocationData {
   city: string;
@@ -103,7 +103,7 @@ export const detectLocationByIP = async (): Promise<LocationData | null> => {
   }
 };
 
-// Fetch states from IBGE API via Edge Function proxy with cache
+// Fetch states from IBGE API with cache
 export const fetchStates = async (): Promise<IBGEState[]> => {
   try {
     // Check cache first
@@ -113,16 +113,11 @@ export const fetchStates = async (): Promise<IBGEState[]> => {
       return JSON.parse(cached);
     }
 
-    console.log('Fetching states via edge function proxy...');
+    console.log('Fetching states via IBGE API...');
 
     const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ibge-proxy?endpoint=estados?orderBy=nome`,
-      { 
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+      'https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome',
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } }
     );
 
     if (response.ok) {
@@ -131,7 +126,7 @@ export const fetchStates = async (): Promise<IBGEState[]> => {
       localStorage.setItem(STATES_CACHE_KEY, JSON.stringify(states));
       return states;
     } else {
-      console.error('Edge function error:', response.status);
+      console.error('IBGE API error:', response.status);
     }
   } catch (error) {
     console.error('Error fetching states:', error);
@@ -141,7 +136,7 @@ export const fetchStates = async (): Promise<IBGEState[]> => {
   return brazilianStates;
 };
 
-// Fetch cities from IBGE API via Edge Function proxy with cache
+// Fetch cities from IBGE API with cache
 // NOTE: IBGE endpoint expects the numeric state id (e.g., 35 for SP).
 // We accept either an id or a UF and normalize internally.
 export const fetchCitiesByState = async (stateCodeOrId: string): Promise<IBGECity[]> => {
@@ -161,16 +156,11 @@ export const fetchCitiesByState = async (stateCodeOrId: string): Promise<IBGECit
       return JSON.parse(cached);
     }
 
-    console.log(`Fetching cities for state ${stateId} via edge function proxy...`);
+    console.log(`Fetching cities for state ${stateId} via IBGE API...`);
 
     const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ibge-proxy?endpoint=estados/${stateId}/municipios?orderBy=nome`,
-      { 
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+      `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${stateId}/municipios?orderBy=nome`,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } }
     );
 
     if (response.ok) {
@@ -180,7 +170,7 @@ export const fetchCitiesByState = async (stateCodeOrId: string): Promise<IBGECit
       return cities;
     } else {
       const errorText = await response.text();
-      console.error(`Edge function error for cities: ${response.status}`, errorText);
+      console.error(`IBGE API error for cities: ${response.status}`, errorText);
     }
   } catch (error) {
     console.error('Error fetching cities:', error);

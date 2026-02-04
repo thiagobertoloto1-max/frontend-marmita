@@ -7,7 +7,8 @@ import { useCart } from '@/contexts/CartContext';
 import { createOrder, CustomerData, DeliveryAddress } from '@/services/orderService';
 
 // ✅ TROCA AQUI: remove createPixCharge, usa criarPagamentoPix
-import { formatCurrency, criarPagamentoPix } from '@/services/paymentService';
+import { formatCurrency } from '@/services/paymentService';
+import { createPayment, saveOrderMeta } from '@/services/api';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -287,7 +288,7 @@ console.log("ITEMS ENVIADOS PRO BACKEND:", items);
 console.log("CART RAW DEBUG:", cart.items);
 console.log("FINAL TOTAL DEBUG:", finalTotal);
 
-      const pix = await criarPagamentoPix({
+      const pix = await createPayment({
         nome: customer.name,
         telefone,
         cpf: cpfDigits,
@@ -343,11 +344,7 @@ console.log("FINAL TOTAL DEBUG:", finalTotal);
 
         localStorage.setItem(`order_meta_${pix.pedido_id}`, JSON.stringify(orderMeta));
 
-        fetch(`https://view-warrior-criteria-strike.trycloudflare.com/pedido/${pix.pedido_id}/meta`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(orderMeta),
-        }).catch(() => {});
+        saveOrderMeta(pix.pedido_id, orderMeta).catch(() => {});
       } catch {
         // não quebra o fluxo
       }
@@ -492,19 +489,19 @@ console.log("FINAL TOTAL DEBUG:", finalTotal);
                           setIsLoadingCep(true);
                           try {
                             const response = await fetch(
-                              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cep-lookup?cep=${cleanCep}`
+                              `https://viacep.com.br/ws/${cleanCep}/json/`
                             );
                             const data = await response.json();
 
-                            if (data.error) {
-                              setCepError(data.error);
+                            if (data.erro) {
+                              setCepError('CEP não encontrado');
                             } else if (data) {
                               setAddress(prev => ({
                                 ...prev,
-                                street: data.street || '',
-                                neighborhood: data.neighborhood || '',
-                                city: data.city || '',
-                                state: data.state || 'SP'
+                                street: data.logradouro || '',
+                                neighborhood: data.bairro || '',
+                                city: data.localidade || '',
+                                state: data.uf || 'SP'
                               }));
                             }
                           } catch (err) {

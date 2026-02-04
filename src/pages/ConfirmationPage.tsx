@@ -4,8 +4,7 @@ import { Copy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import logo from "@/assets/logoreal.webp";
-
-const API_BASE = "https://view-warrior-criteria-strike.trycloudflare.com";
+import { getOrder } from "@/services/api";
 
 /**
  * ✅ TESTE: 1 minuto (depois você volta para 10*60)
@@ -109,14 +108,7 @@ const ConfirmationPage: React.FC = () => {
 
     const fetchPedido = async () => {
       try {
-        const resp = await fetch(`${API_BASE}/pedido/${pedidoId}`);
-        const data = await resp.json();
-
-        if (!resp.ok) {
-          setErro(data?.erro || "Pedido não encontrado.");
-          return;
-        }
-
+        const data = await getOrder(pedidoId);
         setPedido(data);
       } catch {
         setErro("Erro de conexão ao buscar pedido.");
@@ -133,10 +125,7 @@ const ConfirmationPage: React.FC = () => {
 
   const interval = setInterval(async () => {
     try {
-      const resp = await fetch(`${API_BASE}/pedido/${pedidoId}`);
-      const data = await resp.json();
-      if (!resp.ok) return;
-
+      const data = await getOrder(pedidoId);
       setPedido(data);
       if (data.status === "PAGO") clearInterval(interval);
     } catch {
@@ -156,7 +145,7 @@ const ConfirmationPage: React.FC = () => {
 
 useEffect(() => {
   if (
-    window.location.hostname === "localhost" &&
+    window.location.hostname === "https://backend.divinosabor.shop" &&
     searchParams.get("paid") === "1"
   ) {
     navigate(`/rastreio/${pedidoId}`);
@@ -198,7 +187,7 @@ useEffect(() => {
       description: "Cole no app do seu banco para pagar.",
     });
   } catch (err) {
-    // 🔁 Fallback para ambientes bloqueados (localhost, tunnel, etc)
+    // 🔁 Fallback para ambientes bloqueados (https://backend.divinosabor.shop, tunnel, etc)
     try {
       const textarea = document.createElement("textarea");
       textarea.value = qrText;

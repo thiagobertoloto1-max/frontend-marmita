@@ -1,8 +1,6 @@
-// Order Service - Order management with database persistence
+// Order Service - Order management with local persistence
 
-import { supabase } from '@/integrations/supabase/client';
 import { Cart, CartItem } from './cartService';
-import { Json } from '@/integrations/supabase/types';
 
 export interface CustomerData {
   name: string;
@@ -60,6 +58,14 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   cancelled: 'Cancelado'
 };
 
+const ORDERS_STORAGE_KEY = 'divino_sabor_orders';
+
+type StoredOrder = Omit<Order, 'createdAt' | 'updatedAt' | 'estimatedDelivery'> & {
+  createdAt: string;
+  updatedAt: string;
+  estimatedDelivery?: string;
+};
+
 // Generate order code
 const generateOrderCode = (): string => {
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -106,159 +112,89 @@ export const createOrder = async (
     updatedAt: now,
     estimatedDelivery: new Date(now.getTime() + estimatedMinutes * 60 * 1000)
   };
-
-  // Save to database
-  const { error } = await supabase
-    .from('orders')
-    .insert({
-      id: orderId,
-      code: orderCode,
-      status: order.status,
-      items: cart.items as unknown as Json,
-      customer_name: customer.name,
-      customer_email: customer.email,
-      customer_phone: customer.phone,
-      delivery_method: deliveryMethod,
-      delivery_address: deliveryAddress as unknown as Json,
-      payment_method: paymentMethod,
-      subtotal: cart.subtotal,
-      delivery_fee: deliveryMethod === 'delivery' ? cart.deliveryFee : 0,
-      discount: cart.discount,
-      total: cart.total,
-      coupon_code: cart.couponCode || null,
-      notes: notes || null,
-      estimated_delivery: order.estimatedDelivery?.toISOString(),
-    });
-
-  if (error) {
-    console.error('Error saving order to database:', error);
-    throw new Error('Failed to create order');
-  }
-
-  console.log('Order created:', orderId);
+  saveOrder(order);
   return order;
 };
 
-// Get order by ID from database
+// Get order by ID from storage
 export const getOrderById = async (orderId: string): Promise<Order | null> => {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('id', orderId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error fetching order:', error);
-    return null;
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  return mapDbOrderToOrder(data);
+  const orders = loadOrders();
+  return orders.find(order => order.id === orderId) || null;
 };
 
-// Get order by code from database
+// Get order by code from storage
 export const getOrderByCode = async (code: string): Promise<Order | null> => {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('code', code)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error fetching order:', error);
-    return null;
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  return mapDbOrderToOrder(data);
+  const orders = loadOrders();
+  return orders.find(order => order.code === code) || null;
 };
 
 // Update order status
 export const updateOrderStatus = async (orderId: string, status: OrderStatus): Promise<Order | null> => {
-  const { data, error } = await supabase
-    .from('orders')
-    .update({ status })
-    .eq('id', orderId)
-    .select()
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error updating order status:', error);
+  const orders = loadOrders();
+  const index = orders.findIndex(order => order.id === orderId);
+  if (index === -1) {
     return null;
   }
 
-  if (!data) {
-    return null;
-  }
-
-  return mapDbOrderToOrder(data);
-};
-
-// Map database record to Order type
-function mapDbOrderToOrder(data: {
-  id: string;
-  code: string;
-  status: string;
-  items: Json;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
-  delivery_method: string;
-  delivery_address: Json | null;
-  payment_method: string;
-  subtotal: number;
-  delivery_fee: number;
-  discount: number;
-  total: number;
-  coupon_code: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-  estimated_delivery: string | null;
-}): Order {
-  return {
-    id: data.id,
-    code: data.code,
-    status: data.status as OrderStatus,
-    items: (Array.isArray(data.items) ? data.items : []) as unknown as CartItem[],
-    customer: {
-      name: data.customer_name,
-      email: data.customer_email,
-      phone: data.customer_phone,
-    },
-    deliveryAddress: data.delivery_address as unknown as DeliveryAddress | undefined,
-    deliveryMethod: data.delivery_method as 'delivery' | 'pickup',
-    paymentMethod: data.payment_method as 'pix' | 'card' | 'cash',
-    subtotal: Number(data.subtotal),
-    deliveryFee: Number(data.delivery_fee),
-    discount: Number(data.discount),
-    total: Number(data.total),
-    couponCode: data.coupon_code || undefined,
-    notes: data.notes || undefined,
-    createdAt: new Date(data.created_at),
-    updatedAt: new Date(data.updated_at),
-    estimatedDelivery: data.estimated_delivery ? new Date(data.estimated_delivery) : undefined,
+  const updated = {
+    ...orders[index],
+    status,
+    updatedAt: new Date(),
   };
-}
+
+  orders[index] = updated;
+  saveOrders(orders);
+  return updated;
+};
 
 // Get user's order history
 export const getOrderHistory = async (): Promise<Order[]> => {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(20);
+  const orders = loadOrders();
+  return orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 20);
+};
 
-  if (error) {
-    console.error('Error fetching order history:', error);
+function loadOrders(): Order[] {
+  try {
+    const raw = localStorage.getItem(ORDERS_STORAGE_KEY);
+    if (!raw) return [];
+    const stored = JSON.parse(raw) as StoredOrder[];
+    return stored.map(fromStoredOrder);
+  } catch (error) {
+    console.error('Error loading orders:', error);
     return [];
   }
+}
 
-  return (data || []).map(mapDbOrderToOrder);
-};
+function saveOrders(orders: Order[]) {
+  try {
+    const stored = orders.map(toStoredOrder);
+    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(stored));
+  } catch (error) {
+    console.error('Error saving orders:', error);
+  }
+}
+
+function saveOrder(order: Order) {
+  const orders = loadOrders();
+  orders.unshift(order);
+  saveOrders(orders);
+}
+
+function toStoredOrder(order: Order): StoredOrder {
+  return {
+    ...order,
+    createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
+    estimatedDelivery: order.estimatedDelivery?.toISOString(),
+  };
+}
+
+function fromStoredOrder(order: StoredOrder): Order {
+  return {
+    ...order,
+    items: (Array.isArray(order.items) ? order.items : []) as CartItem[],
+    createdAt: new Date(order.createdAt),
+    updatedAt: new Date(order.updatedAt),
+    estimatedDelivery: order.estimatedDelivery ? new Date(order.estimatedDelivery) : undefined,
+  };
+}
