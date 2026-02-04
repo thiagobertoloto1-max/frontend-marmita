@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import logo from "@/assets/logoreal.webp";
 
-const API_BASE = "https://fruits-against-makes-intervals.trycloudflare.com";
+const API_BASE = "https://view-warrior-criteria-strike.trycloudflare.com";
 
 /**
  * ✅ TESTE: 1 minuto (depois você volta para 10*60)

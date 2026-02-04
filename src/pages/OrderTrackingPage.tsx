@@ -56,7 +56,7 @@ export default function OrderTrackingPage() {
   const baseProgress = stage === 1 ? 33 : stage === 2 ? 66 : 100;
 
   // Carrega meta do pedido (itens/endereço/pagamento)
-  const API_BASE = "https://fruits-against-makes-intervals.trycloudflare.com"; // ou coloque sua URL fixa do backend
+  const API_BASE = "https://view-warrior-criteria-strike.trycloudflare.com"; // ou coloque sua URL fixa do backend
 
 useEffect(() => {
   let cancelled = false;

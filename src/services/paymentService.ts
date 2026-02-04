@@ -1,7 +1,7 @@
 // src/services/paymentService.ts
 // Pagamento Pix via backend Render (AnubisPay) — versão estável + compatibilidade
 
-const API_BASE = "https://fruits-against-makes-intervals.trycloudflare.com";
+const API_BASE = "https://view-warrior-criteria-strike.trycloudflare.com";
 
 /* ------------------------------------------------------------------
    TIPOS

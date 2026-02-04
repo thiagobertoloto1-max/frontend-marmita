@@ -343,7 +343,7 @@ console.log("FINAL TOTAL DEBUG:", finalTotal);
 
         localStorage.setItem(`order_meta_${pix.pedido_id}`, JSON.stringify(orderMeta));
 
-        fetch(`https://fruits-against-makes-intervals.trycloudflare.com/pedido/${pix.pedido_id}/meta`, {
+        fetch(`https://view-warrior-criteria-strike.trycloudflare.com/pedido/${pix.pedido_id}/meta`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(orderMeta),
