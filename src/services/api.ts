@@ -20,6 +20,8 @@ export type CreatePaymentResponse = {
     url: string | null;
     expiration_date: string;
     e2_e: string | null;
+    copy_paste_code?: string;
+    qr_image?: string | null;
   };
 };
 
@@ -58,19 +60,25 @@ export type OrderMeta = {
   createdAt?: string;
 };
 
+export const PROD_API_BASE = "https://backend.divinosabor.shop";
+
 export function getApiBase() {
-  const base = import.meta.env.VITE_API_BASE;
+  const base = String(import.meta.env.VITE_API_BASE || "").trim();
 
   if (!base) throw new Error("VITE_API_BASE não definido");
 
-  // ✅ Só força backend.divinosabor.shop em produção
-  if (!import.meta.env.DEV) {
-    if (base !== "https://backend.divinosabor.shop") {
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    const isLocalhost =
+      hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
+    // ✅ Só força backend.divinosabor.shop em produção (host não-local)
+    if (!isLocalhost && base !== PROD_API_BASE) {
       throw new Error("VITE_API_BASE deve apontar para https://backend.divinosabor.shop");
     }
   }
 
-  return base;
+  return base.replace(/\/+$/, "");
 }
 
 async function requestJson<T>(
@@ -79,13 +87,22 @@ async function requestJson<T>(
   fallbackError: string
 ): Promise<T> {
   const resp = await fetch(`${getApiBase()}${path}`, options);
-  const data = await resp.json().catch(() => ({}));
+  const rawText = await resp.text();
+  let data: any = null;
+  try {
+    data = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    data = null;
+  }
 
   if (!resp.ok) {
+    if (resp.status === 400) {
+      console.error("API 400:", data ?? rawText);
+    }
     throw new Error((data as any)?.erro || fallbackError);
   }
 
-  return data as T;
+  return (data ?? {}) as T;
 }
 
 export async function createPayment(

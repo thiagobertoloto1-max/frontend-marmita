@@ -199,185 +199,193 @@ const CheckoutPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-  if (!validateStep()) return;
+    if (!validateStep()) return;
 
-  setIsSubmitting(true);
+    setIsSubmitting(true);
 
-  try {
-    // CPF obrigatório para PIX
-    // @ts-ignore
-    const cpfRaw = customer.cpf || "";
-    const cpfDigits = cpfRaw.replace(/\D/g, "");
+    try {
+      // CPF obrigatório para PIX
+      // @ts-ignore
+      const cpfRaw = customer.cpf || "";
+      const cpfDigits = String(cpfRaw).replace(/\D/g, "");
 
-    if (paymentMethod === "pix" && cpfDigits.length !== 11) {
-      alert("CPF é obrigatório (11 dígitos) para pagamento via PIX");
-      return;
-    }
- 
-    // Total (mantém sua lógica)
-    const finalTotal =
-      deliveryMethod === "pickup"
-        ? cart.subtotal - cart.discount
-        : cart.total;
-
-    // Cria order no sistema antigo (mantemos por compatibilidade)
-    const order = await createOrder(
-      { ...cart, total: finalTotal, deliveryFee: deliveryMethod === "pickup" ? 0 : cart.deliveryFee },
-      customer,
-      deliveryMethod === "delivery" ? address : undefined,
-      deliveryMethod,
-      paymentMethod
-    );
-
-    // PIX: chama backend novo
-    if (paymentMethod === "pix") {
-      const phoneDigits = customer.phone.replace(/\D/g, "");
-      const telefone = phoneDigits.startsWith("55") ? `+${phoneDigits}` : `+55${phoneDigits}`;
-
-      // ✅ Itens para cobrar no PIX (marmita + adicionais pagos)
-const items: { sku: string; qty: number }[] = [];
-
-// ✅ Map de refri MAIOR (1L/2L) -> SKU do backend
-const BIG_REF_SKU: Record<string, string> = {
-  coca_1l: "refri_maior:coca_1l",
-  guarana_1l: "refri_maior:guarana_1l",
-  fanta_1l: "refri_maior:fanta_1l",
-  coca_2l: "refri_maior:coca_2l",
-  guarana_2l: "refri_maior:guarana_2l",
-  fanta_2l: "refri_maior:fanta_2l",
-};
-
-for (const item of cart.items as any[]) {
-  // 1) item principal (marmita)
-  items.push({
-    sku: `${item.product.id}:${item.size.id}`,
-    qty: item.quantity,
-  });
-
-  // 2) adicionais escolhidos no carrinho
-  const picks = extractPickedChoices(item);
-
-  // DEBUG (temporário)
-  console.log("PICKS (adicionais detectados):", picks);
-
-  for (const p of picks) {
-    // 2A) LATA 350ml paga (multi 0–2)
-    const lataSku = PAID_ADDON_SKU[p.id];
-if (lataSku) {
-  // ✅ só cobra se o adicional tiver preço > 0
-  const price = typeof p.price === "number" ? p.price : 0;
-  if (price > 0) {
-    items.push({ sku: lataSku, qty: p.qty ?? 1 });
-  }
-  continue;
-}
-
-    // 2B) REFRI MAIOR (single 0–1)
-    const bigSku = BIG_REF_SKU[p.id];
-    if (bigSku) {
-      items.push({ sku: bigSku, qty: 1 });
-      continue;
-    }
-
-    // 2C) Adicionais grátis (salada/vinagrete/purê/farofa) → NÃO entram no PIX
-  }
-}
-
-// DEBUG
-console.log("ITEMS ENVIADOS PRO BACKEND:", items);
-console.log("CART RAW DEBUG:", cart.items);
-console.log("FINAL TOTAL DEBUG:", finalTotal);
-
-      const pix = await createPayment({
-        nome: customer.name,
-        telefone,
-        cpf: cpfDigits,
-        items,
-      });
-
-      // ✅ meta para tracking (local + backend)
-      try {
-        const orderMeta = {
-  restaurantName: "Divino Sabor Marmitas",
-  paymentMethod: "PIX",
-  customerName: customer.name,
-  customerPhone: telefone,
-
-  address:
-    address && (address.street || address.number || address.neighborhood || address.city || address.zipCode)
-      ? {
-          street: address.street || "",
-          number: address.number || "",
-          complement: address.complement || "",
-          neighborhood: address.neighborhood || "",
-          city: address.city || "",
-          state: address.state || "SP",
-          zipCode: address.zipCode || "",
-        }
-      : null,
-
-  items: cart.items.map((it: any) => {
-    const picks = extractPickedChoices(it);
-
-    return {
-      name: it.product.name,
-      size: it.size?.name,
-      qty: it.quantity,
-      price: it.totalPrice,
-
-      // ✅ adicionais (pagos + grátis) para exibição
-      addons: picks.map((c: any) => ({
-        id: c.id,
-        label: c.label ?? c.id,
-        qty: c.qty ?? 1,
-        price: typeof c.price === "number" ? c.price : 0,
-      })),
-    };
-  }),
-
-  totalReais:
-    pix.total_reais ??
-    (pix.total_cents ? (pix.total_cents / 100).toFixed(2) : undefined),
-
-  createdAt: new Date().toISOString(),
-};
-
-        localStorage.setItem(`order_meta_${pix.pedido_id}`, JSON.stringify(orderMeta));
-
-        saveOrderMeta(pix.pedido_id, orderMeta).catch(() => {});
-      } catch {
-        // não quebra o fluxo
+      if (paymentMethod === "pix" && cpfDigits.length !== 11) {
+        alert("CPF é obrigatório (11 dígitos) para pagamento via PIX");
+        setIsSubmitting(false); // Importante parar aqui
+        return;
       }
 
+      // Total (mantém sua lógica)
+      const finalTotal =
+        deliveryMethod === "pickup"
+          ? cart.subtotal - cart.discount
+          : cart.total;
+
+      // Cria order no sistema antigo (mantemos por compatibilidade)
+      const order = await createOrder(
+        { ...cart, total: finalTotal, deliveryFee: deliveryMethod === "pickup" ? 0 : cart.deliveryFee },
+        customer,
+        deliveryMethod === "delivery" ? address : undefined,
+        deliveryMethod,
+        paymentMethod
+      );
+
+      // PIX: chama backend novo
+      if (paymentMethod === "pix") {
+        const telefone = String(customer.phone || "").replace(/\D/g, "");
+
+        // ✅ Itens para cobrar no PIX (marmita + adicionais pagos)
+        const items: { sku: string; qty: number }[] = [];
+
+        // ✅ Map de refri MAIOR (1L/2L) -> SKU do backend
+        const BIG_REF_SKU: Record<string, string> = {
+          coca_1l: "refri_maior:coca_1l",
+          guarana_1l: "refri_maior:guarana_1l",
+          fanta_1l: "refri_maior:fanta_1l",
+          coca_2l: "refri_maior:coca_2l",
+          guarana_2l: "refri_maior:guarana_2l",
+          fanta_2l: "refri_maior:fanta_2l",
+        };
+
+        for (const item of cart.items as any[]) {
+          // 1) item principal (marmita)
+          items.push({
+            sku: `${item.product.id}:${item.size.id}`,
+            qty: item.quantity,
+          });
+
+          // 2) adicionais escolhidos no carrinho
+          const picks = extractPickedChoices(item);
+
+          for (const p of picks) {
+            // 2A) LATA 350ml paga (multi 0–2)
+            const lataSku = PAID_ADDON_SKU[p.id];
+            if (lataSku) {
+              // ✅ só cobra se o adicional tiver preço > 0
+              const price = typeof p.price === "number" ? p.price : 0;
+              if (price > 0) {
+                items.push({ sku: lataSku, qty: p.qty ?? 1 });
+              }
+              continue;
+            }
+
+            // 2B) REFRI MAIOR (single 0–1)
+            const bigSku = BIG_REF_SKU[p.id];
+            if (bigSku) {
+              items.push({ sku: bigSku, qty: 1 });
+              continue;
+            }
+
+            // 2C) Adicionais grátis (salada/vinagrete/purê/farofa) → NÃO entram no PIX
+          }
+        }
+
+        if (!items || items.length === 0) {
+           throw new Error("Carrinho sem itens válidos para cobrança PIX.");
+        }
+
+        const emailPayload = customer.email?.trim() || "teste@exemplo.com.br";
+
+        // DEBUG
+        console.log("PAYLOAD /create-payment:", { 
+          nome: customer.name, 
+          telefone, 
+          cpf: cpfDigits, 
+          items, 
+          email: emailPayload 
+        });
+
+        const pix = await createPayment({
+          nome: customer.name,
+          telefone: telefone,           // string somente dígitos
+          cpf: cpfDigits,               // string somente dígitos
+          items: items,                 // array preenchido
+          email: emailPayload,          // email obrigatório
+        });
+
+        // ✅ meta para tracking (local + backend)
+        try {
+          const orderMeta = {
+            restaurantName: "Divino Sabor Marmitas",
+            paymentMethod: "PIX",
+            customerName: customer.name,
+            customerPhone: telefone,
+
+            address:
+              address && (address.street || address.number || address.neighborhood || address.city || address.zipCode)
+                ? {
+                    street: address.street || "",
+                    number: address.number || "",
+                    complement: address.complement || "",
+                    neighborhood: address.neighborhood || "",
+                    city: address.city || "",
+                    state: address.state || "SP",
+                    zipCode: address.zipCode || "",
+                  }
+                : null,
+
+            items: cart.items.map((it: any) => {
+              const picks = extractPickedChoices(it);
+
+              return {
+                name: it.product.name,
+                size: it.size?.name,
+                qty: it.quantity,
+                price: it.totalPrice,
+
+                // ✅ adicionais (pagos + grátis) para exibição
+                addons: picks.map((c: any) => ({
+                  id: c.id,
+                  label: c.label ?? c.id,
+                  qty: c.qty ?? 1,
+                  price: typeof c.price === "number" ? c.price : 0,
+                })),
+              };
+            }),
+
+            totalReais:
+              pix.total_reais ??
+              (pix.total_cents ? (pix.total_cents / 100).toFixed(2) : undefined),
+
+            createdAt: new Date().toISOString(),
+          };
+
+          localStorage.setItem(`order_meta_${pix.pedido_id}`, JSON.stringify(orderMeta));
+
+          saveOrderMeta(pix.pedido_id, orderMeta).catch(() => { });
+        } catch {
+          // não quebra o fluxo
+        }
+
+        clearCart();
+
+        navigate(`/pagar/${pix.pedido_id}`, {
+          state: {
+            pix: pix.pix,
+            pedido_id: pix.pedido_id,
+            transacao_id: pix.transacao_id,
+            total_reais: pix.total_reais,
+            customerName: customer.name,
+          },
+        });
+
+        return; // <-- importantíssimo para não cair no fluxo antigo
+      }
+
+      // Para outros métodos (não usados agora), mantém o fluxo antigo
       clearCart();
-
-      navigate(`/pagar/${pix.pedido_id}`, {
-        state: {
-          pix: pix.pix,
-          pedido_id: pix.pedido_id,
-          transacao_id: pix.transacao_id,
-          total_reais: pix.total_reais,
-          customerName: customer.name,
-        },
+      navigate(`/pagar/${order.id}`);
+    } catch (error: any) {
+      console.error("Error creating order:", error);
+      toast({
+        title: "Erro ao criar pedido",
+        description: "Tente novamente em alguns instantes",
+        variant: "destructive",
       });
-
-      return; // <-- importantíssimo para não cair no fluxo antigo
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Para outros métodos (não usados agora), mantém o fluxo antigo
-    clearCart();
-    navigate(`/pagar/${order.id}`);
-  } catch (error: any) {
-    console.error("Error creating order:", error);
-    toast({
-      title: "Erro ao criar pedido",
-      description: "Tente novamente em alguns instantes",
-      variant: "destructive",
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -682,37 +690,37 @@ console.log("FINAL TOTAL DEBUG:", finalTotal);
               <h3 className="font-semibold mb-3">Resumo do Pedido</h3>
               <div className="space-y-2 text-sm">
                 {cart.items.map((item: any) => {
-  const picks = extractPickedChoices(item);
+                  const picks = extractPickedChoices(item);
 
-  return (
-    <div key={item.id} className="space-y-1">
-      <div className="flex justify-between">
-        <span className="text-muted-foreground">
-          {item.quantity}x {item.product.name} ({item.size.name})
-        </span>
-        <span>{formatCurrency(item.totalPrice)}</span>
-      </div>
+                  return (
+                    <div key={item.id} className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          {item.quantity}x {item.product.name} ({item.size.name})
+                        </span>
+                        <span>{formatCurrency(item.totalPrice)}</span>
+                      </div>
 
-      {/* ✅ Adicionais (pagos + grátis) */}
-      {picks.length > 0 && (
-        <div className="pl-3 text-xs text-muted-foreground space-y-0.5">
-          {picks.map((p: any, idx: number) => {
-            const qty = p.qty ?? 1;
-            const price = typeof p.price === "number" ? p.price : 0;
-            const label = p.label ?? p.id;
+                      {/* ✅ Adicionais (pagos + grátis) */}
+                      {picks.length > 0 && (
+                        <div className="pl-3 text-xs text-muted-foreground space-y-0.5">
+                          {picks.map((p: any, idx: number) => {
+                            const qty = p.qty ?? 1;
+                            const price = typeof p.price === "number" ? p.price : 0;
+                            const label = p.label ?? p.id;
 
-            return (
-              <div key={idx}>
-                • {qty > 1 ? `${qty}x ` : ""}{label}
-                {price > 0 ? ` (+${formatCurrency(price)})` : " (grátis)"}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-})}
+                            return (
+                              <div key={idx}>
+                                • {qty > 1 ? `${qty}x ` : ""}{label}
+                                {price > 0 ? ` (+${formatCurrency(price)})` : " (grátis)"}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 <div className="border-t border-border pt-2 mt-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>

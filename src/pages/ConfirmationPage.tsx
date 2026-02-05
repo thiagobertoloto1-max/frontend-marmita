@@ -4,7 +4,7 @@ import { Copy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import logo from "@/assets/logoreal.webp";
-import { getOrder } from "@/services/api";
+import { getOrder, getApiBase, PROD_API_BASE } from "@/services/api";
 
 /**
  * ✅ TESTE: 1 minuto (depois você volta para 10*60)
@@ -144,10 +144,16 @@ const ConfirmationPage: React.FC = () => {
 }, [pedido?.status, pedidoId, navigate]);
 
 useEffect(() => {
-  if (
-    window.location.hostname === "https://backend.divinosabor.shop" &&
-    searchParams.get("paid") === "1"
-  ) {
+  if (!Number.isFinite(pedidoId)) return;
+
+  let isProdBackend = false;
+  try {
+    isProdBackend = getApiBase() === PROD_API_BASE;
+  } catch {
+    isProdBackend = false;
+  }
+
+  if (isProdBackend && searchParams.get("paid") === "1") {
     navigate(`/rastreio/${pedidoId}`);
   }
 }, [searchParams, pedidoId, navigate]);
