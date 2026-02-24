@@ -9,7 +9,7 @@ Sistema de pedidos online para delivery de marmitas com pagamento via PIX integr
 Configure a variável abaixo no ambiente do frontend:
 
 ```
-VITE_API_BASE=https://api.divinosabor.shop
+VITE_API_BASE=https://backend-marmita.onrender.com
 ```
 
 ### 3. Testar Integração

@@ -60,7 +60,7 @@ export type OrderMeta = {
   createdAt?: string;
 };
 
-export const PROD_API_BASE = "https://api.divinosabor.shop";
+export const PROD_API_BASE = "https://backend-marmita.onrender.com";
 
 export function getApiBase() {
   const base = String(import.meta.env.VITE_API_BASE || "").trim();
@@ -72,9 +72,9 @@ export function getApiBase() {
     const isLocalhost =
       hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 
-    // ✅ Só força api.divinosabor.shop em produção (host não-local)
+    // ✅ Só força https://backend-marmita.onrender.com em produção (host não-local)
     if (!isLocalhost && base !== PROD_API_BASE) {
-      throw new Error("VITE_API_BASE deve apontar para https://api.divinosabor.shop");
+      throw new Error("VITE_API_BASE deve apontar para https://backend-marmita.onrender.com");
     }
   }
 

@@ -193,7 +193,7 @@ useEffect(() => {
       description: "Cole no app do seu banco para pagar.",
     });
   } catch (err) {
-    // 🔁 Fallback para ambientes bloqueados (https://api.divinosabor.shop, tunnel, etc)
+    // 🔁 Fallback para ambientes bloqueados (https://backend-marmita.onrender.com, tunnel, etc)
     try {
       const textarea = document.createElement("textarea");
       textarea.value = qrText;
